@@ -138,8 +138,10 @@ RUN ln -sf /var/lib/rabbitmq/.erlang.cookie /root/
 
 RUN ln -sf "/usr/lib/rabbitmq/lib/rabbitmq_server-$RABBITMQ_VERSION/plugins" /plugins
 
-RUN rabbitmq-plugins --offline enable rabbitmq_management
-RUN rabbitmq-plugins --offline enable rabbitmq_peer_discovery_aws
+RUN rabbitmq-plugins --offline enable \
+        rabbitmq_management \
+        rabbitmq_peer_discovery_aws \
+    && rabbitmq-plugins list
 
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN ln -s usr/local/bin/docker-entrypoint.sh / # backwards compat
