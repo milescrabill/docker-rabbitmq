@@ -144,8 +144,9 @@ RUN rabbitmq-plugins --offline enable \
     && rabbitmq-plugins list
 
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN ln -s usr/local/bin/docker-entrypoint.sh / # backwards compat
-ENTRYPOINT ["docker-entrypoint.sh"]
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN ln -s /usr/local/bin/docker-entrypoint.sh / # backwards compat
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 EXPOSE 4369 5671 5672 25672
 CMD ["rabbitmq-server"]
