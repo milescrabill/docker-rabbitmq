@@ -11,7 +11,8 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
-RUN groupadd -r rabbitmq && useradd -r -d /var/lib/rabbitmq -m -g rabbitmq rabbitmq
+RUN addgroup --gid 11002 rabbitmq
+RUN useradd --uid 11002 --gid 11002 -r -d /var/lib/rabbitmq -m -g rabbitmq rabbitmq
 
 # grab gosu for easy step-down from root
 ENV GOSU_VERSION 1.10
@@ -143,10 +144,37 @@ RUN rabbitmq-plugins --offline enable \
         rabbitmq_peer_discovery_aws \
     && rabbitmq-plugins list
 
+# copied from management dockerfile: https://github.com/docker-library/rabbitmq/blob/4b2b11c59ee65c2a09616b163d4572559a86bb7b/3.7/debian/management/Dockerfile
+
+# extract "rabbitmqadmin" from inside the "rabbitmq_management-X.Y.Z.ez" plugin zipfile
+# see https://github.com/docker-library/rabbitmq/issues/207
+RUN set -eux; \
+    erl -noinput -eval ' \
+        { ok, AdminBin } = zip:foldl(fun(FileInArchive, GetInfo, GetBin, Acc) -> \
+            case Acc of \
+                "" -> \
+                    case lists:suffix("/rabbitmqadmin", FileInArchive) of \
+                        true -> GetBin(); \
+                        false -> Acc \
+                    end; \
+                _ -> Acc \
+            end \
+        end, "", init:get_plain_arguments()), \
+        io:format("~s", [ AdminBin ]), \
+        init:stop(). \
+    ' -- /plugins/rabbitmq_management-*.ez > /usr/local/bin/rabbitmqadmin; \
+    [ -s /usr/local/bin/rabbitmqadmin ]; \
+    chmod +x /usr/local/bin/rabbitmqadmin; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends python; \
+    rm -rf /var/lib/apt/lists/*; \
+rabbitmqadmin --version
+
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 RUN ln -s /usr/local/bin/docker-entrypoint.sh / # backwards compat
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-EXPOSE 4369 5671 5672 25672
+# addition of admin ports
+EXPOSE 4369 5671 5672 15671 15672 25672
 CMD ["rabbitmq-server"]
